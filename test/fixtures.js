@@ -2,9 +2,9 @@ module.exports = function() {
     return [{
         "request": {
             "method": "POST",
-            "url": "http://example.com",
+            "url": "http://httpbin.org/post",
             "data": {
-                "bar": "baz"
+                "message": "test_login"
             }
         },
         "response": {
