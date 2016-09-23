@@ -8,34 +8,54 @@ go.app = function() {
     var JsonApi = vumigo.http.api.JsonApi;
 
     var api_url = 'http://api'; // TODO
-    var msisdn = '27831234567'; //TODO
+    var msisdn = '27831234568'; // TODO
 
     var GoApp = App.extend(function(self) {
-
+        
         App.call(self, 'states:start');
 
         self.init = function() {
             self.http = new JsonApi(self.im);
+            if (self.im.config.msisdn) { // TODO - used for testing. Is there a better way?
+                msisdn = self.im.config.msisdn;
+            }
+            return self.im.contacts.for_user()
+                .then(function(user_contact) {
+                    self.contact = user_contact;
+                    var url = api_url + '/ussd/user_registration/' + msisdn + '/';
+                    return self.http.get(url);
+                })
+                .then(function(resp){
+                    self.contact.name = resp.data.name;
+                    self.contact.extra = resp.data;
+                    return self.im.contacts.save(self.contact);
+                });
         };
 
+
+        ///// Registration states /////
+
         self.states.add('states:start', function(name) {
-            self.im.log(self.im.user.addr);
-            var promise = self.http.get(api_url + '/ussd/user_registration/' + msisdn + '/').then(function(resp) {
-                //if (resp.registration_complete)
-                // If registration is complete - send to menu
-                // else start or resume registration flow
-                return new ChoiceState(name, {
-                    question: 'Welcome to Save4Life. Your easy airtime wallet that rewards you for saving a little every week!',
-                    choices: [
-                        new Choice('states:registration_step_1', 'Get Started'),
-                        new Choice('states:tandc', 'Read T&Cs'),
-                        new Choice('states:end', 'Exit')],
-                    next: function(choice) {
-                        return choice.value;
-                    }
-                });
+            //self.im.log(self.im.user.addr);
+            // If registration is complete - send to menu
+            if (self.contact.name && self.contact.extra.goal_item && self.contact.extra.goal_amount) {
+                return self.states.create('states:main_menu');
+            }
+            // else start registration flow
+            return self.states.create('states:registration_menu');
+        });
+
+        self.states.add('states:registration_menu', function(name) {
+            return new ChoiceState(name, {
+                question: 'Welcome to Save4Life. Your easy airtime wallet that rewards you for saving a little every week!',
+                choices: [
+                    new Choice('states:registration_step_1', 'Get Started'),
+                    new Choice('states:tandc', 'Read T&Cs'),
+                    new Choice('states:end', 'Exit')],
+                next: function(choice) {
+                    return choice.value;
+                }
             });
-            return promise;
         });
 
         self.states.add('states:registration_step_1', function(name) {
@@ -111,7 +131,6 @@ go.app = function() {
             });
         });
 
-
         self.states.add('states:registration_step_3_other', function(name) {
             return new FreeText(name, {
                 question: 'Please enter the amount you want to save e.g. 1000',
@@ -126,8 +145,24 @@ go.app = function() {
 
         self.states.add('states:end_registration', function(name) {
             return new EndState(name, {
-                text: 'Thanks for registering for Save4Life, [name]. Now it\'s time to start saving. Dial back in to redeem your first Save4Life voucher and save.',
+                text: 'Thanks for registering for Save4Life, ' + self.contact.name + '. Now it\'s time to start saving. Dial back in to redeem your first Save4Life voucher and save.',
                 next: 'states:start'
+            });
+        });
+
+        self.states.add('states:main_menu', function(name) {
+            return new ChoiceState(name, {
+                question: 'Welcome back to Save4Life ' + self.contact.name + ' you have R' + self.contact.extra.balance + ' saved for ' + self.contact.extra.goal_item + '.',
+                choices: [
+                    new Choice('states:redeem_voucher', 'Redeem voucher'),
+                    new Choice('states:rewards', 'Earn rewards'),
+                    new Choice('states:quiz', 'Take quiz'),
+                    new Choice('states:withdrawal', 'Withdrawal'),
+                    new Choice('states:settings', 'Edit settings')
+                ],
+                next: function(choice) {
+                    return choice.value;
+                }
             });
         });
     });
