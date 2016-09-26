@@ -211,4 +211,64 @@ describe("Save4Life app", function() {
         });
     });
 
+    ////// Voucher redemption flow //////
+    describe("Voucher redemption flow", function() {
+        var app;
+        var tester;
+
+        beforeEach(function() {
+            app = new go.app.GoApp();
+
+            tester = new AppTester(app);
+
+            tester
+                .setup.config.app({
+                    name: 'test_app',
+                    msisdn: '27830000000'
+                })
+                .setup(function(api) {
+                    fixtures().forEach(api.http.fixtures.add);
+                });
+        });
+
+
+        describe("when a user enters an invalid voucher code", function() {
+            it("show them the invalid voucher screen", function() {
+                return tester
+                    .setup.user.state('states:voucher_input')
+                    .input('50')
+                    .check.interaction({
+                        state: 'states:voucher_invalid'
+                    })
+                    .run();
+            });
+        });
+        
+        describe("when a user enters an used voucher code", function() {
+            it("show them the voucher used screen", function() {
+                return tester
+                    .setup.user.state('states:voucher_input')
+                    .input('123456789012')
+                    .check.interaction({
+                        state: 'states:voucher_used'
+                    })
+                    .run();
+            });
+        });
+
+        describe("when a user enters a valid voucher code the first time", function() {
+            it("ask them how much they want to save each time", function() {
+                return tester
+                    .setup.user.state('states:voucher_input')
+                    .input('111122223333')
+                    .check.interaction({
+                        state: 'states:voucher_valid_recur_not_set'
+                    })
+                    .run();
+            });
+        });
+
+
+    });
+
 });

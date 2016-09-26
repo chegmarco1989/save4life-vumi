@@ -79,6 +79,55 @@ module.exports = function() {
                     "balance": "0",
                 }
             }
+        },
+        {
+            "request": {
+                "method": "POST",
+                "url": "http://api/ussd/voucher/verify/",
+                "data": {
+                    "voucher_code":"50",
+                    "msisdn":"27830000000"
+                }
+            },
+            "response": {
+                "code": 200,
+                "data": {
+                    "status":"invalid"
+                }
+            }
+        },
+        {
+            "request": {
+                "method": "POST",
+                "url": "http://api/ussd/voucher/verify/",
+                "data": {
+                    "voucher_code":"123456789012",
+                    "msisdn":"27830000000"
+                }
+            },
+            "response": {
+                "code": 200,
+                "data": {
+                    "status":"used"
+                }
+            }
+        },
+        {
+            "request": {
+                "method": "POST",
+                "url": "http://api/ussd/voucher/verify/",
+                "data": {
+                    "voucher_code":"111122223333",
+                    "msisdn":"27830000000"
+                }
+            },
+            "response": {
+                "code": 200,
+                "data": {
+                    "status":"valid"
+                }
+            }
         }
+
     ];
 };

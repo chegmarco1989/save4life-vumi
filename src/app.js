@@ -19,16 +19,13 @@ go.app = function() {
             if (self.im.config.msisdn) { // TODO - used for testing. Is there a better way?
                 msisdn = self.im.config.msisdn;
             }
-            return self.im.contacts.for_user()
-                .then(function(user_contact) {
-                    self.contact = user_contact;
-                    var url = api_url + '/ussd/user_registration/' + msisdn + '/';
-                    return self.http.get(url);
-                })
+            var url = api_url + '/ussd/user_registration/' + msisdn + '/';
+            self.user_data = {};
+            return self.http.get(url)
                 .then(function(resp){
-                    self.contact.name = resp.data.name;
-                    self.contact.extra = resp.data;
-                    return self.im.contacts.save(self.contact);
+                    self.user_data.name = resp.data.name;
+                    self.user_data.extra = resp.data;
+                    //return self.im.user_datas.save(self.user_data);
                 });
         };
 
@@ -38,7 +35,7 @@ go.app = function() {
         self.states.add('states:start', function(name) {
             //self.im.log(self.im.user.addr);
             // If registration is complete - send to menu
-            if (self.contact.name && self.contact.extra.goal_item && self.contact.extra.goal_amount) {
+            if (self.user_data.name && self.user_data.extra.goal_item && self.user_data.extra.goal_amount) {
                 return self.states.create('states:main_menu');
             }
             // else start registration flow
@@ -145,16 +142,16 @@ go.app = function() {
 
         self.states.add('states:end_registration', function(name) {
             return new EndState(name, {
-                text: 'Thanks for registering for Save4Life, ' + self.contact.name + '. Now it\'s time to start saving. Dial back in to redeem your first Save4Life voucher and save.',
+                text: 'Thanks for registering for Save4Life, ' + self.user_data.name + '. Now it\'s time to start saving. Dial back in to redeem your first Save4Life voucher and save.',
                 next: 'states:start'
             });
         });
 
         self.states.add('states:main_menu', function(name) {
             return new ChoiceState(name, {
-                question: 'Welcome back to Save4Life ' + self.contact.name + ' you have R' + self.contact.extra.balance + ' saved for ' + self.contact.extra.goal_item + '.',
+                question: 'Welcome back to Save4Life ' + self.user_data.name + ' you have R' + self.user_data.extra.balance + ' saved for ' + self.user_data.extra.goal_item + '.',
                 choices: [
-                    new Choice('states:redeem_voucher', 'Redeem voucher'),
+                    new Choice('states:voucher_input', 'Redeem voucher'),
                     new Choice('states:rewards', 'Earn rewards'),
                     new Choice('states:quiz', 'Take quiz'),
                     new Choice('states:withdrawal', 'Withdrawal'),
@@ -165,7 +162,116 @@ go.app = function() {
                 }
             });
         });
+
+        self.states.add('states:voucher_input', function(name) {
+            return new FreeText(name, {
+                question: 'Please enter the Save4Life voucher code you purchased.',
+                next: function(content){
+                    var promise = self.http.post(api_url + '/ussd/voucher/verify/', {
+                        data: {
+                            voucher_code: content,
+                            msisdn: msisdn
+                        }
+                    }).then(function(resp){
+                        if (resp.data.status === 'valid'){
+                            self.im.user.set_answer('voucher_amount', resp.data.amount);
+                            if (self.user_data.recurring_amount){
+                                return 'states:voucher_valid';
+                            } else {
+                                return 'states:voucher_valid_recur_not_set';
+                            }
+                        } else if (resp.data.status === 'used'){
+                            return 'states:voucher_used';
+                        } else if (resp.data.status === 'invalid'){
+                            return 'states:voucher_invalid';
+                        }
+                        return null; 
+                    });
+                    return promise;
+                }
+            });
+        });
+
+        self.states.add('states:voucher_invalid', function(name) {
+            return new FreeText(name, {
+                question: 'The code you entered is not a valid Save4Life voucher code. Please try again. e.g. 123456789078',
+                choices: [
+                    new Choice('states:voucher_input', 'Try again'),
+                    new Choice('states:end', 'Exit')
+                ],
+                next: function(choice){
+                    return choice.value;
+                }
+            });
+        });
+
+        self.states.add('states:voucher_used', function(name) {
+            return new FreeText(name, {
+                question: 'This voucher code has already been used. Please enter a new Save4Life airtime voucher code.',
+                choices: [
+                    new Choice('states:voucher_input', 'Try again'),
+                    new Choice('states:end', 'Exit')
+                ],
+                next: function(choice){
+                    return choice.value;
+                }
+            });
+        });
+
+        self.states.add('states:voucher_valid_recur_not_set', function(name) {
+            var voucherAmount = self.im.user.get_answer('voucher_amount');
+            var choices = [];
+            // TODO - pick sensible amounts and limit options
+            for (var savingsAmount = 10; savingsAmount <= voucherAmount; savingsAmount += 10){
+                choices.push(new Choice(savingsAmount, 'R' + savingsAmount));
+            }
+            return new ChoiceState(name, {
+                question: 'Thanks. How much of your R' + voucherAmount + ' voucher would you like to save?',
+                choices: choices,
+                next: function(choice){
+                    return 'states:voucher_recur_confirm';
+                }
+            });
+        });
+
+        self.states.add('states:voucher_recur_confirm', function(name) {
+            return new ChoiceState(name, {
+                question: 'Thanks ' + self.user_data.name + '! Would you like to save this amount every time you redeem a Save4Life airtime voucher?',
+                choices: [
+                    new Choice('yes', 'Yes'),
+                    new Choice('no', 'No')
+                ],
+                next: function(choice){
+                    
+                    return 'states:voucher_redeem;
+                }
+            });
+        });
+
+        // Redeem voucher
+        self.states.add('states:voucher_redeem', function(name) {
+            var savings_amount = 0; //TODO
+            var promise = self.http.post(api_url + '/ussd/voucher/verify/', {
+                data: {
+                    voucher_code: self.im.user.get_answer('states:voucher_input'),
+                    savings_amount: savings_amount,
+                    save_recurring_amount: true, //TODO
+                    msisdn: msisdn
+                }
+            }).then(function(resp){
+                // See if goal was reached
+                // else
+                return self.states.create('states:savings_update');
+            });
+            return promise;
+        });
+
+
+
+
     });
+
+
 
     return {
         GoApp: GoApp
