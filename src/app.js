@@ -243,7 +243,7 @@ go.app = function() {
                 ],
                 next: function(choice){
                     
-                    return 'states:voucher_redeem;
+                    return 'states:voucher_redeem';
                 }
             });
         });
