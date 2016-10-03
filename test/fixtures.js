@@ -124,10 +124,63 @@ module.exports = function() {
             "response": {
                 "code": 200,
                 "data": {
-                    "status":"valid"
+                    "status":"valid",
+                    "amount": 60
+                }
+            }
+        },
+        {
+            "request": {
+                "method": "GET",
+                "url": "http://api/ussd/user_registration/27830000111/"
+            },
+            "response": {
+                "code": 200,
+                "data": {
+                    "msisdn": "27830000111",
+                    "name": "Mr. Krabs",
+                    "goal_item": "Braai tongs",
+                    "goal_amount": "5000",
+                    "balance": "0",
+                    "recurring_amount": 20
+                }
+            }
+        },
+        {
+            "request": {
+                "method": "POST",
+                "url": "http://api/ussd/voucher/verify/",
+                "data": {
+                    "voucher_code":"111122223333",
+                    "msisdn":"27830000111"
+                }
+            },
+            "response": {
+                "code": 200,
+                "data": {
+                    "status":"valid",
+                    "amount": 80
+                }
+            }
+        },
+        {
+            "request": {
+                "method": "POST",
+                "url": "http://api/ussd/voucher/redeem/",
+                "data": {
+                    "voucher_code":"9999",
+                    "msisdn":"27830000000",
+                    "savings_amount" : "30"
+                }
+            },
+            "response": {
+                "code": 200,
+                "data": {
+                    "status":"success"
                 }
             }
         }
+
 
     ];
 };
