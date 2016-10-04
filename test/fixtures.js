@@ -51,7 +51,7 @@ module.exports = function() {
                 "method": "POST",
                 "url": "http://api/ussd/user_registration/27831234567/",
                 "data": {
-                    "goal_amount": "50"
+                    "goal_amount": 50
                 }
             },
             "response": {
@@ -60,7 +60,7 @@ module.exports = function() {
                     "msisdn": "27831234567",
                     "name": "Spongebob",
                     "goal_item": "music",
-                    "goal_amount": "50"
+                    "goal_amount": 50
                 }
             }
         },
@@ -75,8 +75,8 @@ module.exports = function() {
                     "msisdn": "27830000000",
                     "name": "Patric",
                     "goal_item": "new pants",
-                    "goal_amount": "500000",
-                    "balance": "0",
+                    "goal_amount": 500,
+                    "balance": 0,
                 }
             }
         },
@@ -140,8 +140,8 @@ module.exports = function() {
                     "msisdn": "27830000111",
                     "name": "Mr. Krabs",
                     "goal_item": "Braai tongs",
-                    "goal_amount": "5000",
-                    "balance": "0",
+                    "goal_amount": 5000,
+                    "balance": 0,
                     "recurring_amount": 20
                 }
             }
@@ -170,7 +170,7 @@ module.exports = function() {
                 "data": {
                     "voucher_code":"9999",
                     "msisdn":"27830000000",
-                    "savings_amount" : "30"
+                    "savings_amount" : 30
                 }
             },
             "response": {
@@ -179,7 +179,105 @@ module.exports = function() {
                     "status":"success"
                 }
             }
-        }
+        },
+        {
+            "request": {
+                "method": "GET",
+                "url": "http://api/ussd/user_registration/27830000222/"
+            },
+            "response": {
+                "code": 200,
+                "data": {
+                    "msisdn": "27830000222",
+                    "name": "Gary the Snail",
+                    "goal_item": "New shell",
+                    "goal_amount": 500,
+                    "balance": 0,
+                    "recurring_amount": 20,
+                    "pin_set": true
+                }
+            }
+        },
+        {
+            "request": {
+                "method": "POST",
+                "url": "http://api/ussd/user_registration/27830000222/",
+                "data": {"recurring_amount":30}
+            },
+            "response": {
+                "code": 200,
+                "data": {}
+            }
+        },
+        {
+            "request": {
+                "method": "POST",
+                "url": "http://api/ussd/voucher/redeem/",
+                "data": {
+                    "voucher_code":"9999",
+                    "msisdn":"27830000222",
+                    "savings_amount" : 30
+                }
+            },
+            "response": {
+                "code": 200,
+                "data": {
+                    "status":"success"
+                }
+            }
+        },
+        {
+            "request": {
+                "method": "POST",
+                "url": "http://api/ussd/voucher/redeem/",
+                "data": {
+                    "voucher_code":"20",
+                    "msisdn":"27830000222",
+                    "savings_amount" : 20
+                }
+            },
+            "response": {
+                "code": 200,
+                "data": {
+                    "status":"success"
+                }
+            }
+        },
+        {
+            "request": {
+                "method": "GET",
+                "url": "http://api/ussd/user_registration/27830000444/"
+            },
+            "response": {
+                "code": 200,
+                "data": {
+                    "msisdn": "27830000444",
+                    "name": "Sheldon",
+                    "goal_item": "Restaurant makeover",
+                    "goal_amount": 1000,
+                    "balance": 960,
+                    "recurring_amount": 50,
+                    "pin_set": true
+                }
+            }
+        },
+        {
+            "request": {
+                "method": "POST",
+                "url": "http://api/ussd/voucher/redeem/",
+                "data": {
+                    "voucher_code":"50",
+                    "msisdn":"27830000444",
+                    "savings_amount" : 50
+                }
+            },
+            "response": {
+                "code": 200,
+                "data": {
+                    "status":"success"
+                }
+            }
+        },
 
 
     ];

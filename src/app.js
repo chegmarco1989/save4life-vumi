@@ -16,14 +16,34 @@ go.app = function() {
         var msisdn = '';
         self.init = function() {
             msisdn = self.im.user.addr; // TODO - not sure if it's a good idea to set here
+            if (self.im.user.addr.indexOf(':') >= 0){
+                msisdn = '27831231234'; // TODO - load this from a config variable
+            }
             self.http = new JsonApi(self.im);
             var url = api_url + '/ussd/user_registration/' + msisdn + '/';
             self.user_data = {};
+            self.im.log('************** fetching user data from API ***************');
             return self.http.get(url)
                 .then(function(resp){
                     self.user_data.name = resp.data.name;
                     self.user_data.extra = resp.data;
                 });
+        };
+
+        self.redeem_voucher = function(voucherCode, savingsAmount){
+            var promise = self.http.post(api_url + '/ussd/voucher/redeem/', {
+                data: {
+                    msisdn: msisdn,
+                    voucher_code: voucherCode,
+                    savings_amount: savingsAmount
+                }
+            }).then(function(resp){
+                // update user balance
+                if (resp.data.status === 'success'){
+                    self.user_data.extra.balance += savingsAmount;
+                }
+            });
+            return promise;
         };
 
 
@@ -105,11 +125,11 @@ go.app = function() {
             return new ChoiceState(name, {
                 question: 'Step 3 of 3: How much do you need to save to reach your goal?',
                 choices: [
-                    new Choice('20', 'R20'),
-                    new Choice('50', 'R50'),
-                    new Choice('75', 'R75'),
-                    new Choice('100', 'R100'),
-                    new Choice('200', 'R200'),
+                    new Choice(20, 'R20'),
+                    new Choice(50, 'R50'),
+                    new Choice(75, 'R75'),
+                    new Choice(100, 'R100'),
+                    new Choice(200, 'R200'),
                     new Choice('other', 'Other amount')
                 ],
                 next: function(choice){
@@ -130,7 +150,7 @@ go.app = function() {
                 question: 'Please enter the amount you want to save e.g. 1000',
                 check: function(content){
                     return self.http.post(api_url + '/ussd/user_registration/' + msisdn + '/', {
-                        data: {goal_amount: content}
+                        data: {goal_amount: parseInt(content)}
                     }).then(function(){ return null; });
                 },
                 next: 'states:end_registration'
@@ -239,27 +259,40 @@ go.app = function() {
                     new Choice('no', 'No')
                 ],
                 next: function(choice){
-                    // Redeem voucher
-                    var savings_amount = self.im.user.get_answer('states:voucher_set_savings_amount');
-                    // TODO set user PIN if it is not already set!
-                    var promise = self.http.post(api_url + '/ussd/voucher/redeem/', {
-                        data: {
-                            msisdn: msisdn,
-                            voucher_code: self.im.user.get_answer('states:voucher_input'),
-                            savings_amount: savings_amount
+                    var savingsAmount = self.im.user.get_answer('states:voucher_set_savings_amount');
+                    var pinCheck = function(){
+                        // set user PIN before redeeming voucher!
+                        if (self.user_data.extra.pin_set !== true){
+                            return 'states:pin_code';
                         }
-                    }).then(function(resp){
-                        if (choice.value === 'yes'){
-                            // store recurring amount
-                            var post_data = { data: { recurring_amount: savings_amount } };
-                            return self.http.post(api_url + '/ussd/user_registration/' + msisdn + '/', post_data).then(function(){ 
-                                return 'states:savings_update';
-                            });
-                        } else {
-                            return 'states:savings_update';
-                        }
-                    });
-                    return promise;
+
+                        // Redeem voucher
+                        return self.redeem_voucher(self.im.user.get_answer('states:voucher_input'), savingsAmount).then(function(){
+                            return 'states:voucher_redeemed';
+                        });
+                        /*
+                        var promise = self.http.post(api_url + '/ussd/voucher/redeem/', {
+                            data: {
+                                msisdn: msisdn,
+                                voucher_code: self.im.user.get_answer('states:voucher_input'),
+                                savings_amount: savingsAmount
+                            }
+                        }).then(function(resp){
+                            return 'states:voucher_redeemed';
+                        });
+                        return promise;
+                        */
+                    };
+
+                    if (choice.value === 'yes'){
+                        // store recurring amount
+                        var post_data = { data: { recurring_amount: savingsAmount } };
+                        return self.http.post(api_url + '/ussd/user_registration/' + msisdn + '/', post_data).then(function(){
+                            return pinCheck();
+                        });
+                    } else {
+                        return pinCheck();
+                    }                   
                 }
             });
         });
@@ -276,8 +309,15 @@ go.app = function() {
                         return 'states:voucher_set_savings_amount';
                     }
                     else {
-                        // TODO - is it possible to reach this state without a pin set?
+                        if (self.user_data.extra.pin_set !== true){
+                            return 'states:pin_code';
+                        }
+
                         // redeem voucher
+                        return self.redeem_voucher(self.im.user.get_answer('states:voucher_input'), self.user_data.extra.recurring_amount).then(function(resp){
+                            return 'states:voucher_redeemed';
+                        });
+                        /*
                         var promise = self.http.post(api_url + '/ussd/voucher/redeem/', {
                             data: {
                                 msisdn: msisdn,
@@ -285,32 +325,79 @@ go.app = function() {
                                 savings_amount: self.user_data.extra.recurring_amount
                             }
                         }).then(function(resp){
-                            return 'states:savings_update';
+                            // TODO Need to update user balance, etc here
+                            return 'states:voucher_redeemed';
                         });
                         return promise;
+                        */
                     }
                 }
             });
         });
 
         self.states.add('states:pin_code', function(name) {
-            // TODO
             return new FreeText(name, {
-                question: 'Great! Now create a 4 number pin code (eg. 0821) that you\'ll use to withdraw your savings. This will protect your account from unauthorised use. Don\'t make it too easy to guess.',
+                question: 'Before you can redeem your voucher and save, you need to create a 4 digit pin code (eg. 0821) that you\'ll use to withdraw your savings.',
                 check: function(content){
-                    return self.http.post(api_url + '/ussd/user_registration/' + msisdn + '/', { data: { name: content}}).then(
+                    return self.http.post(api_url + '/ussd/user_registration/' + msisdn + '/', { data: { pin: content}}).then(
                         function(){ return null; }
                     );
                 },
-                next: 'states:registration_step_2'
+                next: 'states:pin_code_saved'
             });
         });
 
         self.states.add('states:pin_code_saved', function(name) {
+            var voucherAmount = self.im.user.get_answer('voucher_amount');
+            var savingsAmount = self.im.user.get_answer('states:voucher_set_savings_amount');
+            if ( !savingsAmount ) {
+                savingsAmount = self.user_data.extra.recurring_amount;
+            }
+            // TODO - handle error if we have no savings amount set?
             return new ChoiceState(name, {
-                question: 'Thanks ' + self.user_data.name + '. Your pin code has been saved!', 
+                question: 'Thanks ' + self.user_data.name + '. Your pin code has been saved! Confirm redeeming a R' + voucherAmount + ' voucher and saving R' + savingsAmount + '.', 
                 choices: [
-                    new Choice('states:main_menu', 'Next'),
+                    new Choice('yes', 'Yes'),
+                    new Choice('no', 'No'),
+                ],
+                next: function(choice){
+                    if (choice.value === 'no'){
+                        return 'states:main_menu';
+                    }
+                    return self.redeem_voucher(self.im.user.get_answer('states:voucher_input'), savingsAmount).then(function(){
+                        return 'states:voucher_redeemed';
+                    });
+                    /*
+                    var promise = self.http.post(api_url + '/ussd/voucher/redeem/', {
+                        data: {
+                            msisdn: msisdn,
+                            voucher_code: self.im.user.get_answer('states:voucher_input'),
+                            savings_amount: savingsAmount
+                        }
+                    }).then(function(resp){
+                        // update savings amount here
+                        return 'states:voucher_redeemed';
+                    });
+                    return promise;
+                    */
+                }
+            });
+        });
+
+        self.states.add('states:voucher_redeemed', function(name){
+            // If user reached their goal
+            if (self.user_data.extra.balance >= self.user_data.extra.goal_amount) {
+                return self.states.create('states:savings_reached');
+            }
+            return self.states.create('states:savings_update');
+        });
+
+        self.states.add('states:savings_update', function(name) {
+            return new ChoiceState(name, {
+                question: 'Well done ' + self.user_data.name + ', your total savings for ' + self.user_data.extra.goal_item + ' is now R' + self.user_data.extra.balance + '. Just R' + (self.user_data.extra.goal_amount - self.user_data.extra.balance) + ' more until you reach your goal R' + self.user_data.extra.goal_amount + ' goal.', 
+                choices: [
+                    new Choice('states:main_menu', 'Menu'),
+                    new Choice('states:exit', 'Exit')
                 ],
                 next: function(choice){
                     return choice.value;
@@ -318,11 +405,11 @@ go.app = function() {
             });
         });
 
-        self.states.add('states:savings_update', function(name) {
-            // TODO - the user balance isn't correctly updated at this point?
+        self.states.add('states:savings_reached', function(name) {
             return new ChoiceState(name, {
-                question: 'Well done ' + self.user_data.name + ', your total savings for ' + self.user_data.extra.goal_item + ' is now R' + self.user_data.extra.balance + ' Just R' + (self.user_data.extra.goal_amount - self.user_data.extra.balance) + ' more until you reach your goal R' + self.user_data.extra.goal_amount + ' goal.', 
+                question: 'Amazing ' + self.user_data.name + '. You\'ve reached your R' + self.user_data.extra.goal_amount + ' savings goal! Congratulations.', 
                 choices: [
+                    new Choice('states:setting_increase_goal', 'Increase your goal amount'),
                     new Choice('states:main_menu', 'Menu'),
                     new Choice('states:exit', 'Exit')
                 ],
