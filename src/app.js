@@ -418,7 +418,110 @@ go.app = function() {
                 }
             });
         });
-        
+
+
+        /////////////////////////////////
+        ////////// Quiz states //////////
+        /////////////////////////////////
+
+        self.states.add('states:quiz', function(name) {
+            var url = api_url + '/ussd/quiz/?msisdn=' + msisdn;
+            var promise = self.http.get(url).then(function(resp){
+                // Store quiz data as an answer
+                self.im.user.set_answer('states:quiz:quiz_data', JSON.stringify(resp.data));
+                // TODO - should show when there is no quiz or if the user already completed the current quiz
+                self.im.user.set_answer('states:quiz:active_question', resp.data.user_progress);
+                
+                return new ChoiceState(name, {
+                    question: 'Take the weekly quiz and stand a chance to win double your savings this week!', 
+                    choices: [
+                        new Choice('states:quiz_question', 'Take the quiz'),
+                        new Choice('states:main_menu', 'Back'),
+                        new Choice('states:exit', 'Exit')
+                    ],
+                    next: function(choice){
+                        return choice.value;
+                    }
+                });
+            });
+            return promise;
+        });
+
+
+        self.states.add('states:quiz_question', function(name) {
+            // get choices for active question
+            var quiz_data = JSON.parse(self.im.user.get_answer('states:quiz:quiz_data'));
+            var active_question = self.im.user.get_answer('states:quiz:active_question');
+            var choices = quiz_data.questions[active_question].options.map(function(choice, i){
+                return new Choice(i, choice);
+            });
+            return new ChoiceState(name, {
+                question: 'Q ' + (active_question+1) + ' of ' + quiz_data.questions.length + ': '  + quiz_data.questions[active_question].question, 
+                choices: choices,
+                next: function(choice){
+                    // store answer
+                    self.im.user.set_answer('states:quiz:question_' + active_question, choice.value);
+                    return 'states:quiz_question_mark';
+                }
+            });
+        });
+
+
+        self.states.add('states:quiz_question_mark', function(name) {
+            var quiz_data = JSON.parse(self.im.user.get_answer('states:quiz:quiz_data'));
+            var active_question = self.im.user.get_answer('states:quiz:active_question');
+            var url = api_url + '/ussd/quiz/' + quiz_data.quiz_id + '/question/' + active_question + '/';
+            var user_response = self.im.user.get_answer('states:quiz:question_' + active_question);
+            var promise = self.http.post(url, { 
+                data: {
+                    'answer': user_response,
+                    'msisdn': msisdn
+                } 
+            }).then(function(resp){
+                // advance active_question
+                active_question += 1;
+                self.im.user.set_answer('states:quiz:active_question', active_question);
+
+                var user_prompt = '';
+                if (resp.data.correct === true){
+                    user_prompt = 'Correct :) ' + resp.data.reinforce_text;
+                } else {
+                    user_prompt = 'You\'ll get it right next time. The answer is ' + resp.data.answer_text;
+                }
+
+                var choices = [];
+                if (active_question >= quiz_data.questions.length){
+                    choices = [new Choice('states:quiz_result', 'Find out my score')];
+                } else {
+                    choices = [new Choice('states:quiz_question', 'Next question')];
+                }
+                return new ChoiceState(name, {
+                    question: user_prompt,
+                    choices: choices,
+                    next: function(choice){
+                        return choice.value;
+                    }
+                });
+
+            });
+            return promise;
+        });
+
+        self.states.add('states:quiz_result', function(name) {
+            // TODO get quiz score
+            var score = 0;
+            var user_prompt = 'Great effort ' + self.user_data.name + '. Your score was ' + score + '/4. We\'ll send you a SMS if you have earned a data bundle this week.';
+            return new ChoiceState(name, {
+                question: user_prompt, 
+                choices: [
+                    new Choice('states:main_menu', 'Menu'),
+                    new Choice('states:exit', 'Exit')
+                ],
+                next: function(choice){
+                    return choice.value;
+                }
+            });
+        });
 
     });
 
