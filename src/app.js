@@ -387,8 +387,9 @@ go.app = function() {
         /////////////////////////////////
 
         self.states.add('states:quiz', function(name) {
-            var url = api_url + '/ussd/quiz/?msisdn=' + msisdn;
-            var promise = self.http.get(url).then(function(resp){
+            var url = api_url + '/ussd/quiz/';
+            var opts = {params: {msisdn: msisdn}};
+            var promise = self.http.get(url, opts).then(function(resp){
                 // Store quiz data as an answer
                 // TODO - should show when there is no quiz or if the user already completed the current quiz
                 self.im.user.set_answer('states:quiz:quiz_data', JSON.stringify(resp.data));
@@ -421,7 +422,6 @@ go.app = function() {
                 question: 'Q ' + (active_question+1) + ' of ' + quiz_data.questions.length + ': '  + quiz_data.questions[active_question].question, 
                 choices: choices,
                 next: function(choice){
-                    self.im.log('************** states:quiz_question.next() ***************');
                     var url = api_url + '/ussd/quiz/' + quiz_data.quiz_id + '/question/' + active_question + '/';
                     var promise = self.http.post(url, { 
                         data: {
@@ -469,19 +469,23 @@ go.app = function() {
         });
 
         self.states.add('states:quiz_result', function(name) {
-            // TODO get quiz score
-            var score = 0;
-            var user_prompt = 'Great effort ' + self.user_data.name + '. Your score was ' + score + '/4. We\'ll send you a SMS if you have earned a data bundle this week.';
-            return new ChoiceState(name, {
-                question: user_prompt, 
-                choices: [
-                    new Choice('states:main_menu', 'Menu'),
-                    new Choice('states:exit', 'Exit')
-                ],
-                next: function(choice){
-                    return choice.value;
-                }
+            // get quiz score
+            var url = api_url + '/ussd/quiz/';
+            var opts = {params: {msisdn: msisdn}};
+            var promise = self.http.get(url, opts).then(function(resp){
+                var user_prompt = 'Great effort ' + self.user_data.name + '. Your score was ' + resp.data.user_score + '/4. We\'ll send you a SMS if you have earned a data bundle this week.';
+                return new ChoiceState(name, {
+                    question: user_prompt, 
+                    choices: [
+                        new Choice('states:main_menu', 'Menu'),
+                        new Choice('states:exit', 'Exit')
+                    ],
+                    next: function(choice){
+                        return choice.value;
+                    }
+                });
             });
+            return promise;
         });
 
     });

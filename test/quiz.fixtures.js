@@ -19,12 +19,16 @@ module.exports = function() {
         {
             "request": {
                 "method": "GET",
-                "url": "http://api/ussd/quiz/"
+                "url": "http://api/ussd/quiz/",
+                "params": {
+                    "msisdn": "27830000000"
+                }
             },
             "response": {
                 "code": 200,
                 "data": {
                     "user_progress": 0,
+                    "user_score": 0,
                     "quiz_id": 1,
                     "questions": [
                         {
