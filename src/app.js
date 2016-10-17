@@ -270,18 +270,6 @@ go.app = function() {
                         return self.redeem_voucher(self.im.user.get_answer('states:voucher_input'), savingsAmount).then(function(){
                             return 'states:voucher_redeemed';
                         });
-                        /*
-                        var promise = self.http.post(api_url + '/ussd/voucher/redeem/', {
-                            data: {
-                                msisdn: msisdn,
-                                voucher_code: self.im.user.get_answer('states:voucher_input'),
-                                savings_amount: savingsAmount
-                            }
-                        }).then(function(resp){
-                            return 'states:voucher_redeemed';
-                        });
-                        return promise;
-                        */
                     };
 
                     if (choice.value === 'yes'){
@@ -317,19 +305,6 @@ go.app = function() {
                         return self.redeem_voucher(self.im.user.get_answer('states:voucher_input'), self.user_data.extra.recurring_amount).then(function(resp){
                             return 'states:voucher_redeemed';
                         });
-                        /*
-                        var promise = self.http.post(api_url + '/ussd/voucher/redeem/', {
-                            data: {
-                                msisdn: msisdn,
-                                voucher_code: self.im.user.get_answer('states:voucher_input'),
-                                savings_amount: self.user_data.extra.recurring_amount
-                            }
-                        }).then(function(resp){
-                            // TODO Need to update user balance, etc here
-                            return 'states:voucher_redeemed';
-                        });
-                        return promise;
-                        */
                     }
                 }
             });
@@ -367,19 +342,6 @@ go.app = function() {
                     return self.redeem_voucher(self.im.user.get_answer('states:voucher_input'), savingsAmount).then(function(){
                         return 'states:voucher_redeemed';
                     });
-                    /*
-                    var promise = self.http.post(api_url + '/ussd/voucher/redeem/', {
-                        data: {
-                            msisdn: msisdn,
-                            voucher_code: self.im.user.get_answer('states:voucher_input'),
-                            savings_amount: savingsAmount
-                        }
-                    }).then(function(resp){
-                        // update savings amount here
-                        return 'states:voucher_redeemed';
-                    });
-                    return promise;
-                    */
                 }
             });
         });
@@ -428,8 +390,8 @@ go.app = function() {
             var url = api_url + '/ussd/quiz/?msisdn=' + msisdn;
             var promise = self.http.get(url).then(function(resp){
                 // Store quiz data as an answer
-                self.im.user.set_answer('states:quiz:quiz_data', JSON.stringify(resp.data));
                 // TODO - should show when there is no quiz or if the user already completed the current quiz
+                self.im.user.set_answer('states:quiz:quiz_data', JSON.stringify(resp.data));
                 self.im.user.set_answer('states:quiz:active_question', resp.data.user_progress);
                 
                 return new ChoiceState(name, {
@@ -459,9 +421,19 @@ go.app = function() {
                 question: 'Q ' + (active_question+1) + ' of ' + quiz_data.questions.length + ': '  + quiz_data.questions[active_question].question, 
                 choices: choices,
                 next: function(choice){
-                    // store answer
-                    self.im.user.set_answer('states:quiz:question_' + active_question, choice.value);
-                    return 'states:quiz_question_mark';
+                    self.im.log('************** states:quiz_question.next() ***************');
+                    var url = api_url + '/ussd/quiz/' + quiz_data.quiz_id + '/question/' + active_question + '/';
+                    var promise = self.http.post(url, { 
+                        data: {
+                            'answer': choice.value,
+                            'msisdn': msisdn
+                        } 
+                    }).then(function(resp){
+                        // store result
+                        self.im.user.set_answer('states:quiz:question_' + active_question, JSON.stringify(resp.data));
+                        return 'states:quiz_question_mark';
+                    });
+                    return promise;
                 }
             });
         });
@@ -470,41 +442,30 @@ go.app = function() {
         self.states.add('states:quiz_question_mark', function(name) {
             var quiz_data = JSON.parse(self.im.user.get_answer('states:quiz:quiz_data'));
             var active_question = self.im.user.get_answer('states:quiz:active_question');
-            var url = api_url + '/ussd/quiz/' + quiz_data.quiz_id + '/question/' + active_question + '/';
-            var user_response = self.im.user.get_answer('states:quiz:question_' + active_question);
-            var promise = self.http.post(url, { 
-                data: {
-                    'answer': user_response,
-                    'msisdn': msisdn
-                } 
-            }).then(function(resp){
-                // advance active_question
-                active_question += 1;
-                self.im.user.set_answer('states:quiz:active_question', active_question);
+            var question_result = JSON.parse(self.im.user.get_answer('states:quiz:question_' + active_question));
 
-                var user_prompt = '';
-                if (resp.data.correct === true){
-                    user_prompt = 'Correct :) ' + resp.data.reinforce_text;
-                } else {
-                    user_prompt = 'You\'ll get it right next time. The answer is ' + resp.data.answer_text;
+            var user_prompt = '';
+            if (question_result.correct === true){
+                user_prompt = 'Correct :) ' + question_result.reinforce_text;
+            } else {
+                user_prompt = 'You\'ll get it right next time. The answer is ' + question_result.answer_text;
+            }
+
+            var choices = [];
+            if (active_question + 1 >= quiz_data.questions.length){
+                choices = [new Choice('states:quiz_result', 'Find out my score')];
+            } else {
+                choices = [new Choice('states:quiz_question', 'Next question')];
+            }
+            return new ChoiceState(name, {
+                question: user_prompt,
+                choices: choices,
+                next: function(choice){
+                    active_question += 1;
+                    self.im.user.set_answer('states:quiz:active_question', active_question);
+                    return choice.value;
                 }
-
-                var choices = [];
-                if (active_question >= quiz_data.questions.length){
-                    choices = [new Choice('states:quiz_result', 'Find out my score')];
-                } else {
-                    choices = [new Choice('states:quiz_question', 'Next question')];
-                }
-                return new ChoiceState(name, {
-                    question: user_prompt,
-                    choices: choices,
-                    next: function(choice){
-                        return choice.value;
-                    }
-                });
-
             });
-            return promise;
         });
 
         self.states.add('states:quiz_result', function(name) {
