@@ -394,14 +394,16 @@ go.app = function() {
                 // TODO - should show when there is no quiz or if the user already completed the current quiz
                 self.im.user.set_answer('states:quiz:quiz_data', JSON.stringify(resp.data));
                 self.im.user.set_answer('states:quiz:active_question', resp.data.user_progress);
-                
+                var choices = [];
+                if (resp.data.user_progress === 0){
+                    choices.push(new Choice('states:quiz_question', 'Take the quiz'));
+                }
+                choices.push(new Choice('states:main_menu', 'Back'));
+                choices.push(new Choice('states:exit', 'Exit'));
+               
                 return new ChoiceState(name, {
                     question: 'Take the weekly quiz and stand a chance to win double your savings this week!', 
-                    choices: [
-                        new Choice('states:quiz_question', 'Take the quiz'),
-                        new Choice('states:main_menu', 'Back'),
-                        new Choice('states:exit', 'Exit')
-                    ],
+                    choices: choices,
                     next: function(choice){
                         return choice.value;
                     }

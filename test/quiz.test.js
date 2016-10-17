@@ -5,7 +5,6 @@ var AppTester = vumigo.AppTester;
 
 describe("Save4Life app", function() {
 
-    ////// Voucher redemption flow //////
     describe("Quiz interface", function() {
         var app;
         var tester;
@@ -22,6 +21,55 @@ describe("Save4Life app", function() {
                 });
         });
 
+        describe("when there is an active quiz", function() {
+            it("ask the user if they want to take the quiz", function() {
+                return tester
+                    .setup.user.addr('27830000000')
+                    .setup.user.state('states:quiz')
+                    .check.interaction({
+                        reply: [
+                            'Take the weekly quiz and stand a chance to win double your savings this week!',
+                            '1. Take the quiz',
+                            '2. Back',
+                            '3. Exit'
+                        ].join('\n')
+                    })
+                    .run();
+            });
+        });
+
+        describe("when the user already completed the active quiz", function() {
+            it("Do not show the take the quiz option", function() {
+                return tester
+                    .setup.user.addr('27830000002')
+                    .setup.user.state('states:quiz')
+                    .check.interaction({
+                        reply: [
+                            'Take the weekly quiz and stand a chance to win double your savings this week!',
+                            '1. Back',
+                            '2. Exit'
+                        ].join('\n')
+                    })
+                    .run();
+            });
+        });
+
+
+        describe("when there is no active quiz", function() {
+            it("Do not show the take the quiz option", function() {
+                return tester
+                    .setup.user.addr('27830000001')
+                    .setup.user.state('states:quiz')
+                    .check.interaction({
+                        reply: [
+                            'Take the weekly quiz and stand a chance to win double your savings this week!',
+                            '1. Back',
+                            '2. Exit'
+                        ].join('\n')
+                    })
+                    .run();
+            });
+        });
 
         describe("when a user starts the quiz", function() {
             it("show them the first question", function() {
@@ -126,7 +174,7 @@ describe("Save4Life app", function() {
         describe("when a user select 'Find out my score'", function() {
             it("show them their quiz result", function() {
                 return tester
-                    .setup.user.addr('27830000000')
+                    .setup.user.addr('27830000002')
                     .setup.user.answer('states:quiz:quiz_data', JSON.stringify(fixtures()[1].response.data))
                     .setup.user.answer('states:quiz:active_question', 3)
                     .setup.user.answer('states:quiz:question_3', 0)
@@ -135,7 +183,7 @@ describe("Save4Life app", function() {
                     .check.interaction({
                         state: 'states:quiz_result',
                         reply: [
-                            'Great effort Patric. Your score was 0/4. We\'ll send you a SMS if you have earned a data bundle this week.',
+                            'Great effort Patric. Your score was 2/4. We\'ll send you a SMS if you have earned a data bundle this week.',
                             '1. Menu',
                             '2. Exit'
                         ].join('\n')
@@ -143,13 +191,6 @@ describe("Save4Life app", function() {
                     .run();
             });
         });
-
-         
-        
-        describe("State states:quiz_question", function(){
-
-        });
-
 
     });
 
