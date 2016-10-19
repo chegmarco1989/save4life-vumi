@@ -382,6 +382,55 @@ go.app = function() {
         });
 
 
+        self.states.add('states:rewards', function(name) {
+            return new ChoiceState(name, {
+                question: 'Save4Life rewards you for good savings habits. Find out what you can earn below if you:',
+                choices: [
+                    new Choice('states:about_savings_streak_1', 'Save consistently each week'),
+                    new Choice('states:about_weekly_quiz_1', 'Take the weekly quiz')
+                ],
+                next: function(choice){
+                    return choice.value;
+                }
+            });
+        });
+
+        self.states.add('states:about_savings_streak_1', function(name){
+            return new ChoiceState(name, {
+                question: 'Saving streaks:\nSave4Life will reward you an airtime bonus if you save for 2 weeks in a row, 4 weeks in a row and 6 weeks in a',
+                choices: [
+                    new Choice('states:about_savings_streak_2', 'Next'),
+                    new Choice('states:reward', 'Back'),
+                    new Choice('states:exit', 'Exit')
+                ],
+                next: function(choice){ return choice.value; }
+            });
+        });
+
+        self.states.add('states:about_savings_streak_2', function(name){
+            return new ChoiceState(name, {
+                question: 'row. The longer your streak, the bigger your reward. Save any amount each week to earn your savings streak rewards',
+                choices: [
+                    new Choice('states:rewards', 'Rewards'),
+                    new Choice('states:about_savings_streak_1', 'Back'),
+                    new Choice('states:exit', 'Exit')
+                ],
+                next: function(choice){ return choice.value; }
+            });
+        });
+
+        self.states.add('states:about_weekly_quiz_1', function(name){
+            return new ChoiceState(name, {
+                question: 'Weekly quiz: Take the quiz and stand a chance to double your savings. Each week we\'ll rewards someone who completes the weekly quiz.',
+                choices: [
+                    new Choice('states:rewards', 'Back'),
+                    new Choice('states:exit', 'Exit')
+                ],
+                next: function(choice){ return choice.value; }
+            });
+        });
+
+
         /////////////////////////////////
         ////////// Quiz states //////////
         /////////////////////////////////
