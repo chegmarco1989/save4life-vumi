@@ -3,7 +3,7 @@ go-jsbox-skeleton
 
 |travis|_
 
-Skeleton for a vumi javascript sandbox app. Use this as a starting point for writing a sandbox app using the `vumi-jssandbox-toolkit`_.
+Vumi javascript sandbox app. Use this as a starting point for writing a sandbox app using the `vumi-jssandbox-toolkit`_.
 
 ::
 
