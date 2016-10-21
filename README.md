@@ -40,7 +40,7 @@ the following port mappings:
     "9010:9010"
     "9011:9011"
 
-and linked to the redis and RabbitMQ containers as *redis* and *rabbitmq* respectively.
+and linked to the redis and RabbitMQ containers as **redis** and **rabbitmq** respectively.
 
 Create a USSD channel and outgoing SMS channel using curl:
 
