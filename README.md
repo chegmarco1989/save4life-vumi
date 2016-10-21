@@ -9,11 +9,11 @@ Run `grunt` to build the final application
 
 # Running the application
 
-To run the application you will need docker. `Dockerfile` specifies a docker image that will run this application using the Vumi JavaScript sandbox worker. You will also need running Redis, RabbitMQ, Junebug, PostgreSQL and [Save4Life HTTP API](https://github.com/dirkcuys/save4life) images.
+To run the application you will need docker. `Dockerfile` specifies a docker image that will run this application using the Vumi JavaScript sandbox worker. You will need running Redis, RabbitMQ, Junebug, PostgreSQL and [Save4Life HTTP API](https://github.com/dirkcuys/save4life) containers.
 
 ## RabbitMQ
 
-RabbitMQ is used by Vumi to pass messages between transports and workers and also by the HTTP API for asynchronous tasks.
+RabbitMQ is used by Vumi to pass messages between transports and workers and by the HTTP API for asynchronous tasks.
 
 Run the latest rabbitmq image from https://hub.docker.com and setup a host, user and permissions to use
 
@@ -27,24 +27,24 @@ Run the latest Redis image from https://hub.docker.com
 
 ## Junebug
 
-Run the [praekeltfoundation/junebug/](https://hub.docker.com/r/praekeltfoundation/junebug/) docker image from https://hub.docker.com with the following environment variables:
+Run the [praekeltfoundation/junebug/](https://hub.docker.com/r/praekeltfoundation/junebug) docker image from https://hub.docker.com with the following environment variables:
 
     REDIS_HOST=redis
     AMQP_HOST=rabbitmq
     AMQP_VHOST=/
 
-The following port mappings:
+the following port mappings:
 
     "8001:80"
     "8080:8080"
     "9010:9010"
     "9011:9011"
 
-and linked to the redis and RabbitMQ containers as redis and rabbitmq respectively.
+and linked to the redis and RabbitMQ containers as *redis* and *rabbitmq* respectively.
 
 Create a USSD channel and outgoing SMS channel using curl:
 
-Command to create USSD channel 
+Command to create USSD channel:
 
     curl -X POST \                                                              
        -d '{
@@ -55,7 +55,7 @@ Command to create USSD channel
         }' \
     http://localhost:8080/channels/
 
-Command to create outgoing SMS channel
+Command to create outgoing SMS channel:
 
     curl -X POST \
         -d '{
