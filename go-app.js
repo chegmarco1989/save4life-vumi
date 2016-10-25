@@ -546,8 +546,187 @@ go.app = function() {
             return promise;
         });
 
-    });
+        /////////////////////////////////
+        //////// Settings states //////// 
+        /////////////////////////////////
+        
+        self.states.add('states:settings', function(name){
+            return new ChoiceState(name, {
+                question: 'Your Safe4Life settings:',
+                choices: [
+                    new Choice('states:change_goal', 'Change goal'),
+                    new Choice('states:change_recur', 'Change recurring savings amount'),
+                    new Choice('states:', 'Read T&Cs'),
+                    new Choice('states:main_menu', 'Back')
+                ],
+                next: function(choice){
+                    return choice.value;
+                }
+            });
+        });
 
+        self.states.add('states:change_goal', function(name){
+            return new ChoiceState(name, {
+                question: 'You are currently trying to save R' + self.user_data.extra.goal_amount + ' for ' + self.user_data.extra.goal_item + '.',
+                choices: [
+                    new Choice('states:change_goal_item', 'Change goal'),
+                    new Choice('states:change_goal_amount', 'Change amount'),
+                    new Choice('states:settings', 'Back')
+                ],
+                next: function(choice){
+                    return choice.value;
+                }
+            });
+        });
+
+        self.states.add('states:change_goal_item', function(name){
+            return new ChoiceState(name, {
+                question: 'What are you saving airtime for?',
+                choices: [
+                    new Choice('call minutes', 'Call minutes'),
+                    new Choice('data bundle', 'Data bundle'),
+                    new Choice('music', 'Music'),
+                    new Choice('games', 'Games'),
+                    new Choice('nothing', 'Nothing in particular'),
+                    new Choice('other', 'Other')
+                ],
+                next: function(choice){
+                    if (choice.value === 'other') {
+                        return 'states:change_goal_item_other';
+                    } else {
+                        var promise = self.http.post(api_url + '/ussd/user_registration/' + msisdn + '/', { data: {goal_item: choice.value}}).then(function(){ 
+                            return 'states:change_goal_item_done';
+                        });
+                        return promise;
+                    }
+                }
+            });
+        });
+
+        self.states.add('states:change_goal_item_other', function(name) {
+            return new FreeText(name, {
+                question: 'Please tell us what you are saving for. e.g. New phone',
+                check: function(content){
+                    var promise = self.http.post(api_url + '/ussd/user_registration/' + msisdn + '/', { data: {goal_item: content}}).then(function(){ 
+                        return null; 
+                    });
+                    return promise;
+                },
+                next: 'states:change_goal_item_done'
+            });
+        });
+
+        self.states.add('states:change_goal_item_done', function(name){
+            return new ChoiceState(name, {
+                question: 'Thanks ' + self.user_data.name + '. Your goal has been updated.',
+                choices: [
+                    new Choice('states:settings', 'Settings'),
+                    new Choice('states:main_menu', 'Menu'),
+                ],
+                next: function(choice){
+                    return choice.value;
+                }
+            });
+        });
+
+        self.states.add('states:change_goal_amount', function(name) {
+            return new ChoiceState(name, {
+                question: 'How much do you need to save?',
+                choices: [
+                    new Choice(20, 'R20'),
+                    new Choice(50, 'R50'),
+                    new Choice(75, 'R75'),
+                    new Choice(100, 'R100'),
+                    new Choice(200, 'R200'),
+                    new Choice('other', 'Other amount')
+                ],
+                next: function(choice){
+                    if (choice.value === 'other') {
+                        return 'states:change_goal_amount_other';
+                    } else {
+                        var promise = self.http.post(api_url + '/ussd/user_registration/' + msisdn + '/', { data: {goal_amount: choice.value}}).then(function(){ 
+                            return 'states:change_goal_item_done';
+                        });
+                        return promise;
+                    }
+                }
+            });
+        });
+
+        self.states.add('states:change_goal_amount_other', function(name) {
+            return new FreeText(name, {
+                question: 'Please enter the amount you want to save e.g. 1000',
+                check: function(content){
+                    return self.http.post(api_url + '/ussd/user_registration/' + msisdn + '/', {
+                        data: {goal_amount: parseInt(content)}
+                    }).then(function(){ return null; });
+                },
+                next: 'states:change_goal_item_done'
+            });
+        });
+
+        self.states.add('states:change_recur', function(name){
+            var change_text = '';
+            var question_text = '';
+            if (self.user_data.extra.recurring_amount){
+                question_text = 'You have currently opted to save R' + self.user_data.extra.recurring_amount + ' each time you redeem a Save4Life voucher.';
+                change_text = 'Edit';
+            } else {
+                question_text = 'You have not set an amount to save each time you redeem a Save4Life voucher.';
+                change_text = 'Set recurring amount';
+            }
+            return new ChoiceState(name, {
+                question: question_text,
+                choices: [
+                    new Choice('states:change_recur_amount', change_text),
+                    new Choice('states:settings', 'Back')
+                ],
+                next: function(choice){
+                    return choice.value;
+                }
+            });
+        });
+
+        self.states.add('states:change_recur_amount', function(name) {
+            return new ChoiceState(name, {
+                question: 'How much of each new voucher you redeem would you like to save?',
+                choices: [
+                    new Choice(5, 'R5'),
+                    new Choice(7, 'R7'),
+                    new Choice(10, 'R10'),
+                    new Choice(15, 'R15'),
+                    new Choice(20, 'R20')
+                ],
+                next: function(choice){
+                    var post_data = { data: { recurring_amount: choice.value } };
+                    return self.http.post(api_url + '/ussd/user_registration/' + msisdn + '/', post_data).then(function(){
+                        return 'states:change_recur_done';
+                    });
+                }
+            });
+        });
+
+        self.states.add('states:change_recur_done', function(name){
+            return new ChoiceState(name, {
+                question: 'Thanks ' + self.user_data.name + '. Your recurring savings amount has been updated.',
+                choices: [
+                    new Choice('states:settings', 'Settings'),
+                    new Choice('states:main_menu', 'Menu'),
+                ],
+                next: function(choice){
+                    return choice.value;
+                }
+            });
+        });
+
+
+
+
+
+
+
+
+    });
     return {
         GoApp: GoApp
     };
