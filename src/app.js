@@ -682,7 +682,7 @@ go.app = function() {
 
         self.states.add('states:change_recur_amount', function(name) {
             return new ChoiceState(name, {
-                question: 'Thanks. How much of each new voucher you redeem would you like to save?',
+                question: 'How much of each new voucher you redeem would you like to save?',
                 choices: [
                     new Choice(5, 'R5'),
                     new Choice(7, 'R7'),
