@@ -21,8 +21,8 @@ describe("Save4Life app", function() {
                 });
         });
 
-        describe("when the user choose settings, show them the settings menu", function() {
-            it("ask their name", function() {
+        describe("when the user choose settings", function() {
+            it("show them the settings menu", function() {
                 return tester
                     .setup.user.state('states:main_menu')
                     .input('5')

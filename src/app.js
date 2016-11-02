@@ -715,7 +715,7 @@ go.app = function() {
         self.states.add('states:withdrawal_screen', function(name){
             var question = '';
             if (self.user_data.extra.balance < self.user_data.extra.goal_amount) {
-                question = 'You haven\'t yet reached your goal of R' + self.user_data.extra.goal_amount + '. Are you sure you want to withdraw your airtime, ' + self.user_data.name;
+                question = 'You haven\'t yet reached your goal of R' + self.user_data.extra.goal_amount + '. Are you sure you want to withdraw your airtime, ' + self.user_data.name + '?';
             } else {
                 question = 'Are you sure you want to withdraw your airtime, ' + self.user_data.name;
             }
@@ -775,8 +775,12 @@ go.app = function() {
                     }
                     if (self.user_data.extra.balance !== amount && self.user_data.extra.balance - amount < 5){
                         // TODO show error - amount left cannot be withdrawn
-                        return 'Your balance needs to be at least R5 or R0. Anything in between you cannot withdraw';
+                        return 'Your resulting balance will be less than the minimum of R5. Please choose a smaller amount or withdraw your whole savings amount.';
                     }
+                    if (amount < 5) {
+                        return 'Your chosen amount is smaller than the minimum of R5';
+                    }
+                    // TODO test that amount is an integer
                     return;
                 },
                 next: 'states:pincode_request'
@@ -825,16 +829,20 @@ go.app = function() {
                 ],
                 next: function(choice){
                     if (choice.value === 'yes'){
-                        var pin_code = '';
-                        var amount = 0;
+                        var pin_code = self.im.user.get_answer('states:pincode_request');
                         var promise = self.http.post(api_url + '/ussd/withdraw/', {
                             data: {
-                                pin_code: pin_code,
+                                pin: pin_code,
                                 amount: amount,
                                 msisdn: msisdn
                             }
                         }).then(function(resp){
-                            return 'states:withdraw_successful';
+                            if (resp.data.status === 'success') {
+                                self.user_data.extra.balance -= amount;
+                                return 'states:withdraw_successful';
+                            } else {
+                                return 'states:withdraw_unsuccessful';
+                            }
                         });
                         return promise;
                     } else {
@@ -856,7 +864,19 @@ go.app = function() {
                 }
             });
         });
- 
+
+        self.states.add('states:withdraw_unsuccessful', function(name){
+            return new ChoiceState(name, {
+                question: 'Unfortunately we cannot process your request at this time. Please try again later.',
+                choices: [
+                    new Choice('states:main_menu', 'Menu'),
+                    new Choice('states:exit', 'Exit'),
+                ],
+                next: function(choice){
+                    return choice.value;
+                }
+            });
+        });
 
     });
     return {

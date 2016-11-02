@@ -178,7 +178,7 @@ go.app = function() {
                     new Choice('states:voucher_input', 'Redeem voucher'),
                     new Choice('states:rewards', 'Earn rewards'),
                     new Choice('states:quiz', 'Take quiz'),
-                    new Choice('states:withdrawal', 'Withdrawal'),
+                    new Choice('states:withdrawal_screen', 'Withdrawal'),
                     new Choice('states:settings', 'Edit settings')
                 ],
                 next: function(choice) {
@@ -719,12 +719,171 @@ go.app = function() {
             });
         });
 
+        self.states.add('states:withdrawal_screen', function(name){
+            var question = '';
+            if (self.user_data.extra.balance < self.user_data.extra.goal_amount) {
+                question = 'You haven\'t yet reached your goal of R' + self.user_data.extra.goal_amount + '. Are you sure you want to withdraw your airtime, ' + self.user_data.name + '?';
+            } else {
+                question = 'Are you sure you want to withdraw your airtime, ' + self.user_data.name;
+            }
+            return new ChoiceState(name, {
+                question: question,
+                choices: [
+                    new Choice('states:withdrawal_amount', 'Yes'),
+                    new Choice('states:cancel_withdrawal', 'Cancel'),
+                ],
+                next: function(choice){
+                    return choice.value;
+                }
+            });
+        });
 
+        self.states.add('states:cancel_withdrawal', function(name){
+            return new ChoiceState(name, {
+                question: 'Great choice!',
+                choices: [
+                    new Choice('states:main_menu', 'Menu'),
+                ],
+                next: function(choice){
+                    return choice.value;
+                }
+            });
+        });
 
+        self.states.add('states:withdrawal_amount', function(name){
+            var choices = [];
+            var amount = 5;
+            while (self.user_data.extra.balance >= amount && amount <= 25){
+                choices.push(new Choice(amount, 'R' + amount));
+                amount += 5;
+            }
+            choices.push(new Choice(0, 'Other amount'));
 
+            return new ChoiceState(name, {
+                question: 'How much would you like to withdraw?',
+                choices: choices,
+                next: function(choice){
+                    if (choice.value === 0){
+                        return 'states:withdrawal_amount_other';
+                    }
+                    return 'states:pincode_request';
+                }
+            });
+        });
 
+        self.states.add('states:withdrawal_amount_other', function(name){
+            return new FreeText(name, {
+                question: 'Enter the amount you would like to withdraw?',
+                check: function(content){
+                    var amount = parseInt(content);
+                    if (amount > self.user_data.extra.balance){
+                        // TODO Show error - amount larger than balance
+                        return 'Amount is bigger than your balance.';
+                    }
+                    if (self.user_data.extra.balance !== amount && self.user_data.extra.balance - amount < 5){
+                        // TODO show error - amount left cannot be withdrawn
+                        return 'Your resulting balance will be less than the minimum of R5. Please choose a smaller amount or withdraw your whole savings amount.';
+                    }
+                    if (amount < 5) {
+                        return 'Your chosen amount is smaller than the minimum of R5';
+                    }
+                    // TODO test that amount is an integer
+                    return;
+                },
+                next: 'states:pincode_request'
+            });
+        });
 
+        self.states.add('states:pincode_request', function(name){
+            return new FreeText(name, {
+                question: 'Please enter your Save4Life pincode now.',
+                check: function(content){
+                    // Call API to verify pincode
+                    var promise = self.http.post(api_url + '/ussd/pin/verify/', {
+                        data: {
+                            pin: content,
+                            msisdn: msisdn
+                        }
+                    }).then(function(resp){
+                        if (resp.data.status !== 'valid'){
+                            // TODO - user will be stuck here without a valid pin code
+                            // We should limit retries to 3
+                            return 'You have not entered a valid 4 number code. Please try again. eg. 0199';
+                        }
+                    });
+                    return promise;
+                },
+                next: 'states:withdraw_confirm'
+            });
+        });
 
+        self.states.add('states:withdraw_confirm', function(name){
+            // Amount is either response to states:withdrawal_amount_other or states:withdrawal_amount
+            var amount = self.im.user.get_answer('states:withdrawal_amount');
+            if (amount === 0){
+                amount = self.im.user.get_answer('states:withdrawal_amount_other');
+            }
+            var question = 'Withdrawing R' + amount + ' will reduce your savings to R' + (self.user_data.extra.balance - amount);
+            if (self.user_data.extra.streak > 0){
+                question += ' and you\'\' loose your ' + self.user_data.extra.streak + ' week streak';
+            }
+            question += '. Please confirm you would like to withdraw this amount';
+            return new ChoiceState(name, {
+                question: question,
+                choices: [
+                    new Choice('yes', 'Yes'),
+                    new Choice('states:cancel_withdrawal', 'Cancel'),
+                ],
+                next: function(choice){
+                    if (choice.value === 'yes'){
+                        var pin_code = self.im.user.get_answer('states:pincode_request');
+                        var promise = self.http.post(api_url + '/ussd/withdraw/', {
+                            data: {
+                                pin: pin_code,
+                                amount: amount,
+                                msisdn: msisdn
+                            }
+                        }).then(function(resp){
+                            if (resp.data.status === 'success') {
+                                self.user_data.extra.balance -= amount;
+                                return 'states:withdraw_successful';
+                            } else {
+                                return 'states:withdraw_unsuccessful';
+                            }
+                        });
+                        return promise;
+                    } else {
+                        return 'states:cancel_withdrawal';
+                    }
+                }
+            });
+        });
+
+        self.states.add('states:withdraw_successful', function(name){
+            return new ChoiceState(name, {
+                question: 'Withdrawal successful. Your new savings balance is R' + self.user_data.extra.balance + '. You\'ll receive a confirmation SMS that shows your airtime credit.',
+                choices: [
+                    new Choice('states:main_menu', 'Menu'),
+                    new Choice('states:exit', 'Exit'),
+                ],
+                next: function(choice){
+                    return choice.value;
+                }
+            });
+        });
+
+        self.states.add('states:withdraw_unsuccessful', function(name){
+            return new ChoiceState(name, {
+                question: 'Unfortunately we cannot process your request at this time. Please try again later.',
+                choices: [
+                    new Choice('states:main_menu', 'Menu'),
+                    new Choice('states:exit', 'Exit'),
+                ],
+                next: function(choice){
+                    return choice.value;
+                }
+            });
+        });
 
     });
     return {
