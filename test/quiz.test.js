@@ -45,7 +45,7 @@ describe("Save4Life app", function() {
                     .setup.user.state('states:quiz')
                     .check.interaction({
                         reply: [
-                            'Take the weekly quiz and stand a chance to win double your savings this week!',
+                            'You\'ve completed the current quiz. We\'ll notify you when there\'s a new quiz available.',
                             '1. Back',
                             '2. Exit'
                         ].join('\n')
@@ -56,13 +56,13 @@ describe("Save4Life app", function() {
 
 
         describe("when there is no active quiz", function() {
-            it("Do not show the take the quiz option", function() {
+            it("do not show the take the quiz option", function() {
                 return tester
                     .setup.user.addr('27830000001')
                     .setup.user.state('states:quiz')
                     .check.interaction({
                         reply: [
-                            'Take the weekly quiz and stand a chance to win double your savings this week!',
+                            'There isn\'t an active quiz right now. We\'ll notify you when there\'s a new quiz available.',
                             '1. Back',
                             '2. Exit'
                         ].join('\n')

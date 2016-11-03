@@ -447,7 +447,6 @@ go.app = function() {
             var opts = {params: {msisdn: msisdn}};
             var promise = self.http.get(url, opts).then(function(resp){
                 // Store quiz data as an answer
-                // TODO - should show when there is no quiz or if the user already completed the current quiz
                 self.im.user.set_answer('states:quiz:quiz_data', JSON.stringify(resp.data));
                 self.im.user.set_answer('states:quiz:active_question', resp.data.user_progress);
                 var choices = [];
@@ -456,9 +455,15 @@ go.app = function() {
                 }
                 choices.push(new Choice('states:main_menu', 'Back'));
                 choices.push(new Choice('states:exit', 'Exit'));
+                var question = 'Take the weekly quiz and stand a chance to win double your savings this week!';
+                if (resp.data.user_progress > 0 && resp.data.user_progress == resp.data.questions.length) {
+                    question = 'You\'ve completed the current quiz. We\'ll notify you when there\'s a new quiz available.';
+                } else if (resp.data.questions === undefined) {
+                    question = 'There isn\'t an active quiz right now. We\'ll notify you when there\'s a new quiz available.';
+                }
                
                 return new ChoiceState(name, {
-                    question: 'Take the weekly quiz and stand a chance to win double your savings this week!', 
+                    question: question, 
                     choices: choices,
                     next: function(choice){
                         return choice.value;
@@ -825,7 +830,7 @@ go.app = function() {
             }
             var question = 'Withdrawing R' + amount + ' will reduce your savings to R' + (self.user_data.extra.balance - amount);
             if (self.user_data.extra.streak > 0){
-                question += ' and you\'\' loose your ' + self.user_data.extra.streak + ' week streak';
+                question += ' and you\'ll loose your ' + self.user_data.extra.streak + ' week streak';
             }
             question += '. Please confirm you would like to withdraw this amount';
             return new ChoiceState(name, {
